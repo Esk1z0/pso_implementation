@@ -106,3 +106,69 @@ def run_pso(
 
 # resultados
     return gbest_pos, gbest_fit, best_history
+
+
+if __name__ == "__main__":
+    print("Probando run_pso (PSO completo)...")
+
+    # Imports locales aquí para evitar dependencias circulares
+    from objective_functions import RastriginFunction
+    from initializer import RandomUniformInitializer
+    from boundary_handler import ClipBoundaryHandler
+    from velocity_clamp import DimensionalClamp
+    from parameter_schedule import FixedParameterSchedule
+    from stopping_criterion import MaxIterationsCriterion
+
+    # ----------------------- Configuración del test -----------------------
+    dim = 2
+    objective = RastriginFunction(dim)
+
+    initializer = RandomUniformInitializer(vmax_fraction=0.2)
+    boundary_handler = ClipBoundaryHandler()
+    velocity_clamp = DimensionalClamp(vmax=0.5)
+    schedule = FixedParameterSchedule(w=0.7, c1=1.4, c2=1.4)
+    stopping = MaxIterationsCriterion()
+
+    swarm_size = 20
+    max_iter = 200
+
+    print(" - Ejecutando PSO gbest básico...")
+    gbest_pos, gbest_fit, history = run_pso(
+        objective=objective,
+        initializer=initializer,
+        boundary_handler=boundary_handler,
+        velocity_clamp=velocity_clamp,
+        parameter_schedule=schedule,
+        stopping_criterion=stopping,
+        swarm_size=swarm_size,
+        max_iter=max_iter,
+    )
+
+    # ----------------------- Validaciones básicas ------------------------
+    # 1. La historia debe tener al menos 1 elemento
+    assert len(history) >= 1
+    print("   * Historial no vacío OK")
+
+    # 2. El mejor fitness debe ser un número real
+    assert isinstance(gbest_fit, float)
+    print("   * gbest_fit es float OK")
+
+    # 3. La posición debe tener la dimensión correcta
+    assert gbest_pos.shape == (dim,)
+    print("   * Dimensión de gbest_pos OK")
+
+    # 4. Comprobamos que el mejor fitness ha mejorado respecto al inicial
+    initial_best = history[0]
+    assert gbest_fit <= initial_best
+    print("   * PSO ha mejorado o igualado el mejor valor inicial OK")
+
+    # 5. Comprobación opcional: Rastrigin debe dar valor cercano a 0 si converge
+    print(f"   * Valor final aproximado: {gbest_fit:.6f}")
+
+    # ---------------- Mostrar historial completo ----------------
+    print("\nHistorial de mejor global (best_history):")
+    for i, val in enumerate(history):
+        print(f" iter {i:03d}: {val:.6f}")
+    
+
+    print("PSO ejecutado correctamente.")

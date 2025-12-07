@@ -76,3 +76,74 @@ class DampeningClamp(VelocityClamp):
         if norm > self.vmax:
             return v * self.factor
         return v
+
+if __name__ == "__main__":
+    print("Probando VelocityClamp...")
+
+    # ============================================================
+    # 1. DimensionalClamp
+    # ============================================================
+    print(" - Probando DimensionalClamp...")
+
+    clamp_dim = DimensionalClamp(vmax=1.0)
+
+    v = np.array([2.0, -3.0, 0.5])
+    v_clamped = clamp_dim.apply(v)
+
+    assert np.allclose(v_clamped, np.array([1.0, -1.0, 0.5]))
+    print("   * Clip por dimensión OK")
+
+    # Prueba: dentro del rango → no cambiar
+    v2 = np.array([0.3, -0.7, 0.9])
+    v2_clamped = clamp_dim.apply(v2)
+    assert np.allclose(v2_clamped, v2)
+    print("   * No modifica velocidades dentro del rango OK")
+
+
+    # ============================================================
+    # 2. NormClamp
+    # ============================================================
+    print(" - Probando NormClamp...")
+
+    clamp_norm = NormClamp(vmax=1.0)
+
+    v = np.array([3.0, 0.0, 0.0])  # norma 3 → se debe escalar a 1
+    v_clamped = clamp_norm.apply(v)
+
+    assert np.allclose(v_clamped, np.array([1.0, 0.0, 0.0]))
+    print("   * Reducir norma correctamente OK")
+
+    # Caso dentro del límite → no modificar
+    v2 = np.array([0.3, 0.4, 0.1])
+    assert np.linalg.norm(v2) < 1.0
+    v2_clamped = clamp_norm.apply(v2)
+    assert np.allclose(v2_clamped, v2)
+    print("   * No modifica velocidad si ya está dentro del límite OK")
+
+    # Caso norma = 0 → no debe dar error ni modificar nada
+    v_zero = np.zeros(3)
+    assert np.allclose(clamp_norm.apply(v_zero), v_zero)
+    print("   * Caso norma cero OK")
+
+
+    # ============================================================
+    # 3. DampeningClamp
+    # ============================================================
+    print(" - Probando DampeningClamp...")
+
+    clamp_damp = DampeningClamp(vmax=1.0, factor=0.5)
+
+    v = np.array([2.0, 0.0, 0.0])  # norma 2.0 > 1.0 → aplicar dampening
+    v_damped = clamp_damp.apply(v)
+
+    # Debe ser v * factor = [1.0, 0, 0]
+    assert np.allclose(v_damped, np.array([1.0, 0.0, 0.0]))
+    print("   * Amortiguación OK")
+
+    # Rango nominal → no modificar
+    v2 = np.array([0.6, 0.2, 0.1])  # norma < 1.0
+    v2_damped = clamp_damp.apply(v2)
+    assert np.allclose(v2_damped, v2)
+    print("   * No amortigua si velocidad dentro de límite OK")
+
+    print("Todas las pruebas de VelocityClamp han pasado correctamente.")

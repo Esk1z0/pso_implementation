@@ -50,3 +50,38 @@ class RastriginFunction(ObjectiveFunction):
     @property
     def bounds(self) -> tuple[np.ndarray, np.ndarray]:
         return self._lower, self._upper
+
+if __name__ == "__main__":
+    print("Probando RastriginFunction...")
+
+    dim = 3
+    f = RastriginFunction(dim=dim)
+
+    # 1. Comprobar bounds
+    lower, upper = f.bounds
+    assert lower.shape == (dim,)
+    assert upper.shape == (dim,)
+    assert np.allclose(lower, -5.12)
+    assert np.allclose(upper,  5.12)
+    print(" - Bounds OK")
+
+    # 2. Óptimo en x = 0 -> valor 0
+    x0 = np.zeros(dim)
+    val0 = f(x0)
+    assert abs(val0 - 0.0) < 1e-12
+    print(" - Óptimo en x=0 OK")
+
+    # 3. Valor conocido para [1, 2]
+    # Rastrigin([1, 2]) = 10*2 + (1^2 - 10*cos(2π)) + (2^2 - 10*cos(4π))
+    #                    = 20 + (1 - 10*1) + (4 - 10*1) = 5
+    x_test = np.array([1.0, 2.0])
+    f_test = RastriginFunction(dim=2)
+    val_test = f_test(x_test)
+    assert abs(val_test - 5.0) < 1e-12
+    print(" - Evaluación en [1, 2] OK")
+
+    # 4. Comprobar name
+    assert f.name == "RastriginFunction"
+    print(" - Name OK")
+
+    print("Todas las pruebas de RastriginFunction han pasado correctamente.")

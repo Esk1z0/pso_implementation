@@ -86,3 +86,59 @@ class StagnationCriterion(StoppingCriterion):
             return True
 
         return False
+
+
+if __name__ == "__main__":
+    print("Probando criterios de parada...")
+
+    # ============================================================
+    # 1. MaxIterationsCriterion
+    # ============================================================
+    print(" - Probando MaxIterationsCriterion...")
+    max_iter_crit = MaxIterationsCriterion()
+
+    assert not max_iter_crit.should_stop(iter_idx=0,  max_iter=10, current_best=0.0)
+    assert not max_iter_crit.should_stop(iter_idx=5,  max_iter=10, current_best=0.0)
+    assert max_iter_crit.should_stop(iter_idx=10, max_iter=10, current_best=0.0)
+    assert max_iter_crit.should_stop(iter_idx=11, max_iter=10, current_best=0.0)
+
+    print("   MaxIterationsCriterion OK")
+
+    # ============================================================
+    # 2. TimeLimitCriterion
+    # ============================================================
+    print(" - Probando TimeLimitCriterion...")
+
+    time_crit = TimeLimitCriterion(max_seconds=0.1)
+    assert not time_crit.should_stop(0, 100, 0.0)  # Just created → should not stop
+
+    time.sleep(0.15)
+    assert time_crit.should_stop(1, 100, 0.0)
+
+    print("   TimeLimitCriterion OK")
+
+    # ============================================================
+    # 3. StagnationCriterion
+    # ============================================================
+    print(" - Probando StagnationCriterion...")
+
+    stag_crit = StagnationCriterion(patience=3, eps=0.0)
+
+    # Primera llamada → inicializa estado
+    assert not stag_crit.should_stop(iter_idx=0, max_iter=999, current_best=10.0)
+
+    # Cambia el valor → debe resetear last_change_iter
+    assert not stag_crit.should_stop(iter_idx=1, max_iter=999, current_best=8.0)
+
+    # Repite el mismo valor durante iteraciones < patience
+    assert not stag_crit.should_stop(iter_idx=2, max_iter=999, current_best=8.0)
+    assert not stag_crit.should_stop(iter_idx=3, max_iter=999, current_best=8.0)
+
+    # Ahora superamos patience (=3)
+    # last_change_iter quedó en iter=1
+    # iter 4 → 4 - 1 = 3 → debería parar
+    assert stag_crit.should_stop(iter_idx=4, max_iter=999, current_best=8.0)
+
+    print("   StagnationCriterion OK")
+
+    print("Todas las pruebas de criterios de parada han pasado correctamente.")

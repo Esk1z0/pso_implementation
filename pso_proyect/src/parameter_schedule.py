@@ -31,3 +31,30 @@ class FixedParameterSchedule(ParameterSchedule):
 
     def get(self, iter_idx: int, max_iter: int) -> tuple[float, float, float]:
         return self.w, self.c1, self.c2
+    
+
+if __name__ == "__main__":
+    print("Probando FixedParameterSchedule...")
+
+    w, c1, c2 = 0.7, 1.4, 1.6
+    schedule = FixedParameterSchedule(w, c1, c2)
+
+    # 1. Comprobar resultados en varias iteraciones
+    for it in [0, 5, 10, 999]:
+        ww, cc1, cc2 = schedule.get(it, 1000)
+        assert ww == w
+        assert cc1 == c1
+        assert cc2 == c2
+    print(" - Devuelve siempre los mismos parámetros OK")
+
+    # 2. Comprobar el nombre
+    assert schedule.name == "FixedParameterSchedule"
+    print(" - Nombre OK")
+
+    # 3. Valores correctos y tipo de retorno
+    params = schedule.get(5, 100)
+    assert isinstance(params, tuple)
+    assert len(params) == 3
+    print(" - Tipo de retorno OK")
+
+    print("Todas las pruebas de FixedParameterSchedule han pasado correctamente.")

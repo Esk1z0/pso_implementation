@@ -51,3 +51,42 @@ class RandomUniformInitializer(Initializer):
 
         return particles
 
+if __name__ == "__main__":
+    print("Probando RandomUniformInitializer...")
+
+    initializer = RandomUniformInitializer(vmax_fraction=0.2)
+
+    swarm_size = 5
+    dim = 3
+    lower = np.array([-5.0, -2.0, 0.0])
+    upper = np.array([5.0,  3.0, 10.0])
+
+    particles = initializer.init_swarm(
+        swarm_size=swarm_size,
+        dim=dim,
+        bounds=(lower, upper)
+    )
+
+    # 1. Comprobar número de partículas
+    assert len(particles) == swarm_size
+    print(" - Número de partículas OK")
+
+    # 2. Comprobar que todas las posiciones están dentro de los límites
+    for p in particles:
+        assert (p.position >= lower).all() and (p.position <= upper).all()
+    print(" - Posiciones dentro de los límites OK")
+
+    # 3. Comprobar velocidades dentro del límite calculado
+    domain = upper - lower
+    vmax = 0.2 * domain
+
+    for p in particles:
+        assert (p.velocity >= -vmax).all() and (p.velocity <= vmax).all()
+    print(" - Velocidades dentro de los límites OK")
+
+    # 4. Comprobar que fitness es None
+    for p in particles:
+        assert p.fitness is None
+    print(" - Fitness inicial es None OK")
+
+    print("Todas las pruebas de RandomUniformInitializer han pasado correctamente.")
