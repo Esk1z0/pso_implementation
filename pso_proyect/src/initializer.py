@@ -10,7 +10,7 @@ class Initializer(ABC):
     """
 
     @abstractmethod
-    def init_swarm(self, swarm_size: int, dim: int, bounds):
+    def init_swarm(self, swarm_size: int, dim: int, bounds) -> list[Particle]:
         """
         swarm_size : número de partículas del enjambre.
         dim        : dimensiones del espacio de búsqueda.
