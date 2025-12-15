@@ -1,0 +1,37 @@
+=== RESUMEN EXPERIMENTO PSO ===
+
+Mejor fitness final: 0.141526
+Mejor posición final: [ 0.01881583 -0.01897794]
+
+Iteraciones ejecutadas: 200
+Tiempo total (s): 0.042091
+
+---- Historial de mejor fitness ----
+  Valor inicial: 4.775910
+  Valor final:   0.141526
+  Mínimo global alcanzado en el historial: 0.141526
+
+---- Velocidad media ----
+  Velocidad media inicial: 1.822839
+  Velocidad media final:   1.754435
+
+---- Diversidad ----
+  Diversidad inicial: 4.083496
+  Diversidad final:   1.548948
+
+---- Mejoras por iteración ----
+  Media de partículas que mejoran: 0.56
+  Máximo de partículas que mejoran: 11
+  Veces que nadie mejora (0 mejoras): 147
+
+---- Parámetros usados ----
+  experiment_name: A3_trial_016
+  dim: 2
+  swarm_size: 20
+  max_iter: 200
+  w: 1.2
+  c1: 1.4
+  c2: 1.4
+  vmax: 1.5
+  initializer_vmax_fraction: 1.0
+  seed: 1250

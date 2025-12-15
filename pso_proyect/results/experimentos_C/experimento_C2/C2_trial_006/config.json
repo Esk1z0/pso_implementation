@@ -1,0 +1,17 @@
+{
+  "experiment_name": "C2_trial_006",
+  "dim": 2,
+  "swarm_size": 20,
+  "max_iter": 200,
+  "w": 0.7,
+  "c1": 1.4,
+  "c2": 1.4,
+  "vmax": 0.5,
+  "initializer_type": "normal",
+  "initializer_center": [
+    0.0,
+    0.0
+  ],
+  "initializer_std": 0.5,
+  "seed": 1240
+}

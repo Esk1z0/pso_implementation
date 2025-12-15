@@ -4,10 +4,10 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import numpy as np
-import matplotlib.pyplot as plt
+import csv
 
 from objective_functions import RastriginFunction
-from initializer import RandomUniformInitializer
+from initializer import RandomUniformInitializer, NormalAroundPointInitializer, Initializer
 from boundary_handler import ClipBoundaryHandler
 from velocity_clamp import DimensionalClamp
 from parameter_schedule import FixedParameterSchedule
@@ -28,7 +28,11 @@ class ExperimentRunner:
     # ------------------------------------------------------------------
     # 1) Ejecutar un experimento
     # ------------------------------------------------------------------
-    def run_experiment(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def run_experiment(
+        self,
+        config: Dict[str, Any],
+        initializer: Initializer | None = None,
+    ) -> Dict[str, Any]:
         """
         Ejecuta un único experimento de PSO con la config indicada.
 
@@ -41,6 +45,8 @@ class ExperimentRunner:
           - vmax            : límite de velocidad para DimensionalClamp
           - initializer_vmax_fraction : fracción para la velocidad inicial
           - seed            : semilla opcional para reproducibilidad
+
+        Si 'initializer' es None, se usa RandomUniformInitializer por defecto.
         """
         experiment_name = config.get("experiment_name", "experiment")
         exp_dir = self.base_output_dir / experiment_name
@@ -61,16 +67,65 @@ class ExperimentRunner:
         seed = config.get("seed", None)
         rng = np.random.default_rng(seed) if seed is not None else None
 
+        # ---------------- LOG DE INICIO ----------------
+        print("\n" + "=" * 70)
+        print(f"[PSO] Iniciando experimento: {experiment_name}")
+        print(f"[PSO] Carpeta de salida: {exp_dir}")
+        print(f"[PSO] Parámetros principales:")
+        print(f"      dim={dim}, swarm_size={swarm_size}, max_iter={max_iter}")
+        print(f"      w={w}, c1={c1}, c2={c2}, vmax={vmax}")
+        print(f"      initializer_vmax_fraction={initializer_vmax_fraction}")
+        print(f"      seed={seed}")
+        print("=" * 70)
+
         # ---------------- Construcción de componentes ----------------
         objective = RastriginFunction(dim)
-        initializer = RandomUniformInitializer(
-            vmax_fraction=initializer_vmax_fraction,
-            rng=rng,
-        )
+
+        # ---------------- Selección del Initializer ----------------
+        if initializer is None:
+            init_type = config.get("initializer_type", "uniform")
+
+            if init_type == "uniform":
+                initializer = RandomUniformInitializer(
+                    vmax_fraction=initializer_vmax_fraction,
+                    rng=rng,
+                )
+                init_name = "RandomUniformInitializer"
+
+            elif init_type == "normal":
+                center = np.asarray(
+                    config.get("initializer_center", [0.0] * dim),
+                    dtype=float
+                )
+                sigma = float(config.get("initializer_std", 0.5))  # <- nombre correcto
+
+                initializer = NormalAroundPointInitializer(
+                    center=center,
+                    sigma=sigma,
+                    vmax_fraction=initializer_vmax_fraction,
+                    rng=rng,
+                )
+                init_name = f"NormalAroundPointInitializer(center={center.tolist()}, sigma={sigma})"
+
+            else:
+                raise ValueError(f"initializer_type desconocido: {init_type}")
+
+        else:
+            init_name = initializer.__class__.__name__
+
+
+
         boundary_handler = ClipBoundaryHandler()
         velocity_clamp = DimensionalClamp(vmax=vmax)
         parameter_schedule = FixedParameterSchedule(w=w, c1=c1, c2=c2)
         stopping_criterion = MaxIterationsCriterion()
+
+        print(f"[PSO] Initializer: {init_name}")
+        print(f"[PSO] BoundaryHandler: {boundary_handler.__class__.__name__}")
+        print(f"[PSO] VelocityClamp: {velocity_clamp.__class__.__name__}")
+        print(f"[PSO] ParameterSchedule: {parameter_schedule.__class__.__name__}")
+        print(f"[PSO] StoppingCriterion: {stopping_criterion.__class__.__name__}")
+        print("-" * 70)
 
         # ---------------- Ejecución del PSO ----------------
         t0 = time.perf_counter()
@@ -92,12 +147,27 @@ class ExperimentRunner:
         pso_results["runtime_seconds"] = elapsed
         pso_results["iterations_executed"] = len(pso_results["best_history"]) - 1
 
-        # Guardar configuración y resultados
-        self._save_config(config, exp_dir / "config.json")
-        self.save_results(pso_results, exp_dir / "results.txt")
-        self._save_plots(pso_results, exp_dir)
+        # Guardar configuración, resumen y métricas en CSV
+        config_path = exp_dir / "config.json"
+        results_txt_path = exp_dir / "results.txt"
+        metrics_csv_path = exp_dir / "metrics.csv"
+        trajectories_csv_path = exp_dir / "trajectories.csv"
+
+        self._save_config(config, config_path)
+        self.save_results(pso_results, results_txt_path)
+        self._save_metrics_csv(pso_results, metrics_csv_path)
+        self._save_trajectories_csv(pso_results, trajectories_csv_path)
+
+        # LOG (si estás usando el logging que añadimos antes)
+        print(f"[PSO] Ficheros generados:")
+        print(f"      - {config_path}")
+        print(f"      - {results_txt_path}")
+        print(f"      - {metrics_csv_path}")
+        print(f"      - {trajectories_csv_path}")
+        print("=" * 70 + "\n")
 
         return pso_results
+
 
     # ------------------------------------------------------------------
     # 2) Ejecutar varios trials del mismo experimento
@@ -106,13 +176,22 @@ class ExperimentRunner:
         self,
         n_trials: int,
         config: Dict[str, Any],
+        initializer: Initializer | None = None,
     ) -> List[Dict[str, Any]]:
         """
         Ejecuta el mismo experimento n_trials veces, cambiando la semilla.
         Crea una carpeta por trial dentro del experimento.
+
+        Si se pasa un 'initializer', se reutiliza el mismo objeto en todos
+        los trials (útil para NormalAroundPointInitializer, por ejemplo).
         """
         experiment_name = config.get("experiment_name", "experiment")
         base_seed = config.get("seed", 1234)
+
+        print("\n" + "#" * 70)
+        print(f"[PSO] Lanzando {n_trials} trials para el experimento base '{experiment_name}'")
+        print(f"[PSO] Carpeta base de resultados: {self.base_output_dir}")
+        print("#" * 70 + "\n")
 
         all_results: List[Dict[str, Any]] = []
 
@@ -123,11 +202,17 @@ class ExperimentRunner:
             cfg["experiment_name"] = f"{experiment_name}_trial_{i:03d}"
 
             print(f"→ Ejecutando trial {i+1}/{n_trials} (seed={trial_seed})...")
-            res = self.run_experiment(cfg)
+            res = self.run_experiment(cfg, initializer=initializer)
             res["trial_index"] = i
             all_results.append(res)
 
+        print("\n" + "#" * 70)
+        print(f"[PSO] Todos los trials de '{experiment_name}' han finalizado.")
+        print(f"[PSO] Directorio raíz de resultados: {self.base_output_dir}")
+        print("#" * 70 + "\n")
+
         return all_results
+
 
     # ------------------------------------------------------------------
     # 3) Comparar parámetros (lista de configs)
@@ -223,8 +308,10 @@ class ExperimentRunner:
                 f.write("---- Mejoras por iteración ----\n")
                 f.write(f"  Media de partículas que mejoran: {np.mean(num_imp):.2f}\n")
                 f.write(f"  Máximo de partículas que mejoran: {np.max(num_imp)}\n")
-                f.write(f"  Veces que nadie mejora (0 mejoras): "
-                        f"{sum(1 for x in num_imp if x == 0)}\n\n")
+                f.write(
+                    f"  Veces que nadie mejora (0 mejoras): "
+                    f"{sum(1 for x in num_imp if x == 0)}\n\n"
+                )
 
             f.write("---- Parámetros usados ----\n")
             cfg = results.get("config", {})
@@ -232,65 +319,102 @@ class ExperimentRunner:
                 f.write(f"  {k}: {v}\n")
 
     # ------------------------------------------------------------------
-    # Utilidades internas: guardar config y plots
+    # Utilidades internas: guardar config y métricas
     # ------------------------------------------------------------------
     def _save_config(self, config: Dict[str, Any], filepath: Path) -> None:
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2)
 
-    def _save_plots(self, results: Dict[str, Any], out_dir: Path) -> None:
+    def _save_metrics_csv(self, results: Dict[str, Any], filepath: Path) -> None:
         """
-        Genera gráficas básicas:
-          - best_history
-          - avg_velocity_history
-          - diversity_history
-          - num_improving_history
+        Guarda en un CSV las series temporales principales del experimento:
+        - iter
+        - best_fit (mejor global tras esa iteración)
+        - avg_velocity
+        - diversity
+        - num_improving
+        - w, c1, c2
         """
-        out_dir.mkdir(parents=True, exist_ok=True)
+        best_history = results["best_history"]          # len = iters + 1 (incluye inicial)
+        avg_vel_hist = results["avg_velocity_history"]  # len = iters
+        div_hist = results["diversity_history"]         # len = iters
+        imp_hist = results["num_improving_history"]     # len = iters
+        w_hist = results["w_history"]
+        c1_hist = results["c1_history"]
+        c2_hist = results["c2_history"]
 
-        # Best history
-        plt.figure()
-        plt.plot(results["best_history"])
-        plt.xlabel("Iteración")
-        plt.ylabel("Mejor fitness global")
-        plt.title("Evolución del mejor fitness")
-        plt.grid(True)
-        plt.tight_layout()
-        plt.savefig(out_dir / "best_history.png")
-        plt.close()
+        n_iters = len(best_history) - 1  # número real de iteraciones ejecutadas
 
-        # Velocidad media
-        if results["avg_velocity_history"]:
-            plt.figure()
-            plt.plot(results["avg_velocity_history"])
-            plt.xlabel("Iteración")
-            plt.ylabel("Velocidad media")
-            plt.title("Evolución de la velocidad media")
-            plt.grid(True)
-            plt.tight_layout()
-            plt.savefig(out_dir / "avg_velocity.png")
-            plt.close()
+        with open(filepath, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            # Cabecera
+            writer.writerow([
+                "iter",
+                "best_fit",
+                "avg_velocity",
+                "diversity",
+                "num_improving",
+                "w",
+                "c1",
+                "c2",
+            ])
 
-        # Diversidad
-        if results["diversity_history"]:
-            plt.figure()
-            plt.plot(results["diversity_history"])
-            plt.xlabel("Iteración")
-            plt.ylabel("Diversidad (distancia media al gbest)")
-            plt.title("Evolución de la diversidad")
-            plt.grid(True)
-            plt.tight_layout()
-            plt.savefig(out_dir / "diversity.png")
-            plt.close()
+            for it in range(n_iters):
+                best_fit = best_history[it + 1]  # después de aplicar la iteración it
 
-        # Mejoras por iteración
-        if results["num_improving_history"]:
-            plt.figure()
-            plt.plot(results["num_improving_history"])
-            plt.xlabel("Iteración")
-            plt.ylabel("Nº de partículas que mejoran")
-            plt.title("Mejoras por iteración")
-            plt.grid(True)
-            plt.tight_layout()
-            plt.savefig(out_dir / "improvements.png")
-            plt.close()
+                avg_v = avg_vel_hist[it] if it < len(avg_vel_hist) else ""
+                div = div_hist[it] if it < len(div_hist) else ""
+                num_imp = imp_hist[it] if it < len(imp_hist) else ""
+
+                w = w_hist[it] if it < len(w_hist) else ""
+                c1 = c1_hist[it] if it < len(c1_hist) else ""
+                c2 = c2_hist[it] if it < len(c2_hist) else ""
+
+                writer.writerow([
+                    it,
+                    best_fit,
+                    avg_v,
+                    div,
+                    num_imp,
+                    w,
+                    c1,
+                    c2,
+                ])
+
+    def _save_trajectories_csv(self, results: Dict[str, Any], filepath: Path) -> None:
+        """
+        Guarda en un CSV las trayectorias completas de todas las partículas.
+
+        Formato:
+        - Columna 'iter' : índice de iteración (0 = estado inicial)
+        - Columnas restantes: p{i}_x{d} para cada partícula i y dimensión d.
+        """
+        positions_history = results.get("swarm_positions_history", None)
+        if positions_history is None or len(positions_history) == 0:
+            return  # nada que guardar
+
+        # positions_history[k] tiene shape (swarm_size, dim)
+        last_snapshot = positions_history[-1]
+        swarm_size, dim = last_snapshot.shape
+
+        import csv
+
+        with open(filepath, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+
+            # Cabecera
+            header = ["iter"]
+            for i in range(swarm_size):
+                for d in range(dim):
+                    header.append(f"p{i}_x{d}")
+            writer.writerow(header)
+
+            # Filas: una por iteración
+            for it, snapshot in enumerate(positions_history):
+                # snapshot: (swarm_size, dim)
+                row = [it]
+                # aplanamos en el orden p0_x0, p0_x1, ..., p1_x0, p1_x1, ...
+                for i in range(swarm_size):
+                    for d in range(dim):
+                        row.append(snapshot[i, d])
+                writer.writerow(row)

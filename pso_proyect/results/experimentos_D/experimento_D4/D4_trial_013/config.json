@@ -1,0 +1,12 @@
+{
+  "experiment_name": "D4_trial_013",
+  "dim": 2,
+  "swarm_size": 20,
+  "max_iter": 200,
+  "w": 0.7,
+  "c1": 2.0,
+  "c2": 0.0,
+  "vmax": 0.5,
+  "initializer_vmax_fraction": 1.0,
+  "seed": 1247
+}

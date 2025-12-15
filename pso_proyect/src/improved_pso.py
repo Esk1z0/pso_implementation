@@ -52,6 +52,12 @@ def run_pso_improved(
     improvements_history = []
     w_history, c1_history, c2_history = [], [], []
 
+    # NUEVO: histórico de posiciones del enjambre
+    # Cada elemento: array de shape (swarm_size, dim)
+    swarm_positions_history = [
+        np.stack([p.position.copy() for p in particles])
+    ]
+
     # ---------------------------- Bucle principal -----------------------------
     for it in range(max_iter):
         w, c1, c2 = parameter_schedule.get(it, max_iter)
@@ -111,6 +117,11 @@ def run_pso_improved(
         ])
         diversity_history.append(diversity)
 
+        # NUEVO: guardar snapshot de posiciones del enjambre en esta iteración
+        swarm_positions_history.append(
+            np.stack([p.position.copy() for p in particles])
+        )
+
         # ----------- 6. PARADA ----------
         if stopping_criterion.should_stop(it, max_iter, gbest_fit):
             break
@@ -126,10 +137,10 @@ def run_pso_improved(
         "num_improving_history": improvements_history,
         "w_history": w_history,
         "c1_history": c1_history,
-        "c2_history": c2_history
+        "c2_history": c2_history,
+        # NUEVO: histórico completo de posiciones del enjambre
+        "swarm_positions_history": swarm_positions_history,
     }
-
-
 
 
 if __name__=="__main__":
